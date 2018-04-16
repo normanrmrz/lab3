@@ -15,14 +15,15 @@
 // Add include for stdlib.
 #include <stdlib.h>
 
-//add definitions of subroutines and BSIZE
+//add prototypes of subroutines and BSIZE
+//also added the appropriate return types for subroutines. 
 void errexit(char * s, char * f);
 void compile(char * astr);
 void execute(char * file);
 int advance(char * lp, char * ep);
 void succeed(char * f);
 int ecmp(char * a, char * b, int count);
-#define BSIZE 1 
+#define BSIZE 512 
 
 #define	CBRA	1
 #define	CCHR	2
@@ -37,15 +38,17 @@ int ecmp(char * a, char * b, int count);
 #define	STAR	01
 
 #define	LBSIZE	512
-#define	ESIZE	256
+#define	ESIZE	8192
 #define	NBRA	9
 
 
 /* expbuff is a variable (char array) that contains the regular expression being passed to grep */
-char	expbuf[ESIZE];
+//char	expbuf[ESIZE];
+char *expbuf;
 long	lnum;
 char	linebuf[LBSIZE+1];
-char	ybuf[ESIZE];
+//char	ybuf[ESIZE];
+char *ybuf;
 int	bflag;
 int	lflag;
 int	nflag;
@@ -71,40 +74,18 @@ char	bittab[] = {
 	128
 };
 
-/* void printbuf(char * ar) {
-	int i = 0;
-	do {
-		if(ar[i] == CBRA)
-			printf("CBRA: ");
-		else if(ar[i] == CCHR)
-			printf("CCHR: ");
-		else if(ar[i] == CDOT)
-			printf("CDOT: ");
-		else if(ar[i] == CCL)
-			printf("CCL: ");
-		else if(ar[i] == NCCL)
-			printf("NCCL: ");
-		else if(ar[i] == CDOL)
-			printf("CDOL: ");
-		else if(ar[i] == CEOF)
-			printf("CEOF\n");
-		else if(ar[i] == CKET)
-			printf("CKET: ");
-		else if(ar[i] == CBACK)
-			printf("CBACK: ");
-		else {
-			printf("%c\n", ar[i]);
-			//printf("%02x ", ar[i]);  // endian reversed
-		}
-		
-		i++;
-	} while(ar[i - 1] != CEOF);
-} */ 
+
+/* Main - The main function first checks for flags and sets them if necessary.
+If the yflag is set, the program goes through a small process to
+build a new expression where characters are replaced with a
+bracketed expression with a lower and an uppercase version of
+the letter. This new expression matches without regardless of case. */ 
 
 int main(argc, argv)
 char **argv;
 {
-
+	expbuf = malloc(ESIZE);
+	ybuf = malloc(ESIZE);
 	while (--argc > 0 && (++argv)[0][0]=='-')
 		switch (argv[0][1]) {
 
@@ -185,11 +166,24 @@ out:
 		argv++;
 		execute(*argv);
 	}
-					//printbuf(expbuf);
 
 	exit(nsucc == 0);
 }
 
+/* Compile - The input to the compile funtion is a pointer to the expression.
+In compile, the program takes the expression in its raw string
+form and converts it into a form useable by the subroutine. 
+This is done using the ep variable which points to the the expbuf variable. 
+expbuf is a buffer for the regular expression and stores it in the following format:
+first, add a tag that indicates the type of the element, and then depending 
+on what type it is, follow it with the contents for the tag. 
+For example, a '.' or an EOF character will be one element in the buffer, 
+replaced by one of the constants defined at the top. 
+For elements, like parens or characters, they will first have an element with the appropriate
+constant added, then for parens, the number for its count is added.
+If it is a character, the actual character is added to the buffer. This
+function returns nothing when finished, but the result of the
+algorithm is stored in expbuf. */
 void compile(astr)
 char *astr;
 {
@@ -203,6 +197,8 @@ char *astr;
 	int closed;
 	char numbra;
 	char neg;
+	char b1, b2;
+	int i;
 
 	ep = expbuf;
 	sp = astr;
@@ -227,6 +223,8 @@ char *astr;
 		case '.':
 			*ep++ = CDOT;
 			continue;
+
+
 
 		case '*':
 			if (lastep==0 || *lastep==CBRA || *lastep==CKET)
@@ -308,6 +306,10 @@ char *astr;
 	errexit("grep: RE error\n", (char *)NULL);
 }
 
+/* Execute - This function manages the process of reading in the 
+lines to be matched. Once the linebuf variable is filled,
+the subroutine advance is called with the line buffer and the expression
+buffer (linebuf and expbuf) as parameters. */
 void execute(file)
 char *file;
 {
@@ -372,6 +374,26 @@ char *file;
 
 }
 
+/* Advance - The goal of the advance function is to step through the
+expression buffer to see if the contents of it are able to be matched
+with the start of the line buffer. If a CCHR is next, then it will
+directly match the next character in the expression buffer to the
+one in the line buffer. For CDOT, it will just continue because
+'.' will match to any character. The advance function will keep processing
+until a case fails, in which case it willreturn 0, or until the CEOF case is
+reached. When the CEOF case is reached, that is a marker for the end
+of the expression, meaning that the entire expression buffer has been processed,
+so in this case it will return true. 
+The advance function will call itself recursively when either a bracketed or
+a parenthesized expression is used with the '*' character. It makes
+the recursive call because the bracket or parenthesis can be treated
+as a smaller expression, where the recursive call will do the matching.
+When control returns to the execute function, if a match was found to
+the inital position in the line buffer, it will jump to the found tag.
+If not, the line buffer will be incremented and it will attempt to match
+again and will continue to do this until it is matched or the end
+of the line buffer is reached.
+ */ 
 int advance(lp, ep)
 register char *lp, *ep;
 {
@@ -488,6 +510,24 @@ register char *lp, *ep;
 
 }
 
+/* Succeed - When a match is found in execute, it goes to the found block, where
+the succeed function is called. The purpose of the succeed function
+is to print to standard out. If no flags are set, then it will only 
+print the contents of linebuf to stdout. 
+Additional output may be printed depending on what flags have been set. 
+For example, if the b flag is set, the byte
+position of the file will be added to line, and if the n flag is set,
+it will add the number of the line. 
+When the succeed function is finished printing, control is passed
+back to the execute function. From there, lines will be read and
+matched from the input file until it reaches the end of the file.
+From there control returns to main function, where the program
+finishes executing by calling exit. When exit is called, it
+checks if nsucc is equal to 0. Since nsucc is set to 1 if a match
+is found in succeed, if there was a match, it will set the exit
+status to 0. 
+If it failed to match, the exit status will be 1. 
+*/
 void succeed(f)
 char *f;
 {
