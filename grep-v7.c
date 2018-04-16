@@ -12,6 +12,17 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <sys/param.h>
+// Add include for stdlib.
+#include <stdlib.h>
+
+//add definitions of subroutines and BSIZE
+void errexit(char * s, char * f);
+void compile(char * astr);
+void execute(char * file);
+int advance(char * lp, char * ep);
+void succeed(char * f);
+int ecmp(char * a, char * b, int count);
+#define BSIZE 1 
 
 #define	CBRA	1
 #define	CCHR	2
@@ -29,6 +40,8 @@
 #define	ESIZE	256
 #define	NBRA	9
 
+
+/* expbuff is a variable (char array) that contains the regular expression being passed to grep */
 char	expbuf[ESIZE];
 long	lnum;
 char	linebuf[LBSIZE+1];
@@ -58,9 +71,40 @@ char	bittab[] = {
 	128
 };
 
-main(argc, argv)
+/* void printbuf(char * ar) {
+	int i = 0;
+	do {
+		if(ar[i] == CBRA)
+			printf("CBRA: ");
+		else if(ar[i] == CCHR)
+			printf("CCHR: ");
+		else if(ar[i] == CDOT)
+			printf("CDOT: ");
+		else if(ar[i] == CCL)
+			printf("CCL: ");
+		else if(ar[i] == NCCL)
+			printf("NCCL: ");
+		else if(ar[i] == CDOL)
+			printf("CDOL: ");
+		else if(ar[i] == CEOF)
+			printf("CEOF\n");
+		else if(ar[i] == CKET)
+			printf("CKET: ");
+		else if(ar[i] == CBACK)
+			printf("CBACK: ");
+		else {
+			printf("%c\n", ar[i]);
+			//printf("%02x ", ar[i]);  // endian reversed
+		}
+		
+		i++;
+	} while(ar[i - 1] != CEOF);
+} */ 
+
+int main(argc, argv)
 char **argv;
 {
+
 	while (--argc > 0 && (++argv)[0][0]=='-')
 		switch (argv[0][1]) {
 
@@ -141,13 +185,16 @@ out:
 		argv++;
 		execute(*argv);
 	}
+					//printbuf(expbuf);
+
 	exit(nsucc == 0);
 }
 
-compile(astr)
+void compile(astr)
 char *astr;
 {
-	register c;
+
+	register int c;
 	register char *ep, *sp;
 	char *cstart;
 	char *lastep;
@@ -261,11 +308,11 @@ char *astr;
 	errexit("grep: RE error\n", (char *)NULL);
 }
 
-execute(file)
+void execute(file)
 char *file;
 {
 	register char *p1, *p2;
-	register c;
+	register int c;
 
 	if (file) {
 		if (freopen(file, "r", stdin) == NULL)
@@ -281,7 +328,7 @@ char *file;
 				if (cflag) {
 					if (nfile>1)
 						printf("%s:", file);
-					printf("%D\n", tln);
+					printf("%lD\n", tln);
 				}
 				return;
 			}
@@ -293,8 +340,9 @@ char *file;
 		p1 = linebuf;
 		p2 = expbuf;
 		if (circf) {
-			if (advance(p1, p2))
+			if (advance(p1, p2)){
 				goto found;
+			}
 			goto nfound;
 		}
 		/* fast check for first character */
@@ -321,9 +369,10 @@ char *file;
 		if (vflag==0)
 			succeed(file);
 	}
+
 }
 
-advance(lp, ep)
+int advance(lp, ep)
 register char *lp, *ep;
 {
 	register char *curlp;
@@ -436,9 +485,10 @@ register char *lp, *ep;
 	default:
 		errexit("grep RE botch\n", (char *)NULL);
 	}
+
 }
 
-succeed(f)
+void succeed(f)
 char *f;
 {
 	long ftell();
@@ -461,18 +511,20 @@ char *f;
 	if (nflag)
 		printf("%ld:", lnum);
 	printf("%s\n", linebuf);
+
+
 }
 
-ecmp(a, b, count)
+int ecmp(a, b, count)
 char	*a, *b;
 {
-	register cc = count;
+	register int cc = count;
 	while(cc--)
 		if(*a++ != *b++)	return(0);
 	return(1);
 }
 
-errexit(s, f)
+void errexit(s, f)
 char *s, *f;
 {
 	fprintf(stderr, s, f);
