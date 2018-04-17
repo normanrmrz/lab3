@@ -224,7 +224,28 @@ char *astr;
 			*ep++ = CDOT;
 			continue;
 
-
+		case '+':
+			if (lastep == 0 || *lastep == CBRA || *lastep == CKET) {
+				goto defchar;
+			}
+			if (*(ep - 2) == CKET) {
+				*ep++ = CBACK;
+				*ep++ = numbra - 1;
+			} else if ((*(ep - 1) == CDOT) || (*(ep - 1) == CDOL)) {
+				b1 = *(ep - 1);
+				*ep++ = b1;
+			} else if (*(ep - 17) == CCL) {
+				*ep++ = CCL;
+				for(i = 17; i > 1; i--) {
+					b1 = *(ep - 17);
+					*ep++ = b1;
+				}
+			} else {
+				b1 = *(ep - 2);
+				b2 = *(ep - 1);
+				*ep++ = b1;
+				*ep++ = b2;
+			}
 
 		case '*':
 			if (lastep==0 || *lastep==CBRA || *lastep==CKET)
