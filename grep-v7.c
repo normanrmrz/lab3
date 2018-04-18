@@ -417,7 +417,8 @@ of the line buffer is reached.
  */ 
 int advance(lp, ep)
 register char *lp, *ep;
-{
+{	
+	printf("ADVANCE\n");
 	register char *curlp;
 	char c;
 	char *bbeg;

@@ -1,4 +1,4 @@
-TARGET = grep
+TARGET = grep-v7
 LIBS = -lm
 CC = gcc
 
